@@ -7,9 +7,10 @@ import com.learnkafka.jpa.LibraryEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -24,7 +25,11 @@ public class LibraryEventsService {
         LibraryEvent libraryEvent = objectMapper.readValue(consumerRecord.value(), LibraryEvent.class);
         log.info("libraryEvent in service: {}", libraryEvent);
 
-        switch (libraryEvent.getLibraryEventType()) {
+        if (libraryEvent != null && libraryEvent.getLibraryEventId() != null) {
+            throw new RecoverableDataAccessException("Temporary Network Issue");
+        }
+
+        switch (Objects.requireNonNull(libraryEvent).getLibraryEventType()) {
             case CREATE -> save(libraryEvent);
             case UPDATE -> update(libraryEvent);
             default -> log.info("Invalid library event type");

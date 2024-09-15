@@ -15,7 +15,8 @@ public class LibraryEventsConsumer {
 
     private final LibraryEventsService libraryEventsService;
 
-    @KafkaListener(topics = {"${spring.kafka.template.default-topic}"}, groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(topics = {"${spring.kafka.template.default-topic}"},
+            groupId = "${spring.kafka.consumer.group-id}")
     public void onMessage(ConsumerRecord<Integer, String> consumerRecord) throws JsonProcessingException, IllegalArgumentException {
 
         log.info("consumerRecord in LibraryEventsConsumer: {}", consumerRecord);

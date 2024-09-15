@@ -15,16 +15,15 @@ public class LibraryEventsRetryConsumer {
 
     private final LibraryEventsService libraryEventsService;
 
-    @KafkaListener(topics = {"${topics.retry}"}, groupId = "retry-listener-group")
+    @KafkaListener(topics = {"${topics.retry}"},
+            autoStartup = "${retryListener.startup:true}", // consumer won't start if startup value isn't 'true'
+            groupId = "retry-listener-group")
     public void onMessage(ConsumerRecord<Integer, String> consumerRecord) throws JsonProcessingException, IllegalArgumentException {
-
         log.info("consumerRecord in RetryConsumer: {}", consumerRecord);
-
         consumerRecord.headers()
                 .forEach(header -> {
                     log.info("key: {}, value: {}", header.key(), new String(header.value()));
                 });
-
         libraryEventsService.processLibraryEvent(consumerRecord);
     }
 }

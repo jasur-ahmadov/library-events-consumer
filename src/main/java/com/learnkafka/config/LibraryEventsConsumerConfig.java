@@ -1,19 +1,18 @@
 package com.learnkafka.config;
 
+import com.learnkafka.service.FailureService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.kafka.ConcurrentKafkaListenerContainerFactoryConfigurer;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.*;
 import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.ConsumerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
-import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.*;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 
 import java.util.List;
@@ -24,7 +23,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LibraryEventsConsumerConfig {
 
+    public static final String RETRY = "RETRY";
+    public static final String DEAD = "DEAD";
+    public static final String SUCCESS = "SUCCESS";
+
     private final KafkaTemplate<Integer, String> kafkaTemplate;
+    private final FailureService failureService;
 
     @Value("${topics.retry}")
     private String retryTopic;
@@ -43,6 +47,21 @@ public class LibraryEventsConsumerConfig {
         return factory;
     }
 
+    ConsumerRecordRecoverer consumerRecordRecoverer = new ConsumerRecordRecoverer() {
+        @Override
+        public void accept(ConsumerRecord<?, ?> consumerRecord, Exception ex) {
+            log.error("Exception in consumerRecordRecoverer : {} ", ex.getMessage(), ex);
+            ConsumerRecord<Integer, String> record = (ConsumerRecord<Integer, String>) consumerRecord;
+            if (ex.getCause() instanceof RecoverableDataAccessException) {
+                log.info("Inside recovery service");
+                failureService.saveFailedRecords(record, ex, RETRY);
+            } else {
+                log.info("Inside non-recovery service");
+                failureService.saveFailedRecords(record, ex, DEAD);
+            }
+        }
+    };
+
     private DefaultErrorHandler errorHandler() {
 
 //        var fixedBackOff = new FixedBackOff(1000L, 2); // 3 attempts in total. Time interval doesn't change over time
@@ -53,7 +72,11 @@ public class LibraryEventsConsumerConfig {
         expBackOff.setMultiplier(2.0);
         expBackOff.setMaxInterval(2_000L);
 
-        var errorHandler = new DefaultErrorHandler(publishingRecoverer(), expBackOff);
+        var errorHandler = new DefaultErrorHandler(
+//                publishingRecoverer(),
+                consumerRecordRecoverer,
+                expBackOff
+        );
 
         var exceptionIgnoreList = List.of( // specific unwanted exceptions not to be considered
                 IllegalArgumentException.class
