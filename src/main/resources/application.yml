@@ -14,6 +14,16 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       group-id: library-events-listener-group
+      auto-offset-reset: earliest # will read from the beginning of the topic if no offsets are found.
+      isolation-level: read_committed # consumers only read committed transaction messages (not intermediate, uncommitted ones)
+      ssl:
+        trust-store-location: file:/Jasur/udemy/kafka-for-developers-using-spring-boot/ssl/client.truststore.jks
+        trust-store-password: password
+        key-store-location: file:/Jasur/udemy/kafka-for-developers-using-spring-boot/ssl/client.keystore.jks
+        key-store-password: password
+      properties:
+        security:
+          protocol: SSL
   datasource:
     url: jdbc:h2:mem:testdb
     driver-class-name: org.h2.Driver
@@ -24,9 +34,11 @@ spring:
   h2:
     console:
       enabled: true
-
+---
 topics:
   retry: library-events.RETRY
   dlt: library-events.DLT
 retryListener:
   startup: true
+server:
+  port: 8081
